@@ -1,0 +1,29 @@
+{
+  "name": "flock",
+  "version": "0.0.1",
+  "description": "Cluster++",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "propagate": "*"
+  },
+  "devDependencies": {
+    "tap": "*"
+  },
+  "scripts": {
+    "test": "node tests/master.js tests/worker.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:pgte/flock.git"
+  },
+  "keywords": [
+    "cluster",
+    "workers",
+    "deploy"
+  ],
+  "author": "pgte",
+  "license": "MIT"
+}

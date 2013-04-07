@@ -11,15 +11,13 @@ test('worker can listen', function(t) {
   var worker = flock.fork();
   worker.once('online', function() {
 
-    console.log('worker is online');
-
     var port = utils.randomPort();
     
     worker.send({command: 'listen', port: port});
 
-    worker.once('message', function(m) {
-      console.log('got', m);
-      t.equal(m, 'listening');
+    worker.once('listening', function(listenData) {
+      t.equal(listenData.address, '0.0.0.0');
+      t.equal(listenData.port, port);
       var socket = net.connect(port, function() {
         socket.end();
         worker.once('exit', function() {

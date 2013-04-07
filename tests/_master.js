@@ -14,8 +14,8 @@ var listening = 0;
 
 workers.forEach(function(worker) {
   worker.send({command: 'listen', port: port});
-  worker.once('message', function(m) {
-    if (m != 'listening') return;
+  worker.once('listening', function(m) {
+    console.log('worker is listening');
     listening ++;
     if (! process.env.FLOCK_TEST_RESTARTED && listening == workers.length) {
       var options = {

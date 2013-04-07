@@ -13,7 +13,7 @@
     "tap": "*"
   },
   "scripts": {
-    "test": "node tests/master.js tests/worker.js"
+    "test": "node tests/master.js tests/worker.js tests/master_worker.js tests/restart.js"
   },
   "repository": {
     "type": "git",

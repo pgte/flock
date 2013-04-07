@@ -5,10 +5,14 @@ var propagate = require('propagate');
 var extend = require('util')._extend;
 var assert = require('assert');
 var net = require('net');
+var extend = require('util')._extend;
 
-var debug = require('./debug')('master ' + process.pid);
+var messages = require('../messages');
+var servers = require('./servers');
+var Worker = require('./worker');
+var debug = require('../debug')('master ' + process.pid);
 
-debug('new master', process.pid);
+debug('new master');
 
 var Master =
 exports =
@@ -23,8 +27,13 @@ Master.isWorker = false;
 
 /// Setup Master
 
+var settings = {
+  timeout: 5000 // default timeout
+};
+
 Master.setupMaster =
-function setupMaster(settings) {
+function setupMaster(_settings) {
+  settings = extend(_settings, settings);
   cluster.setupMaster.apply(cluster, arguments);
 };
 
@@ -34,40 +43,27 @@ function setupMaster(settings) {
 var serverHandlers = {};
 
 function workerInit(worker) {
-  worker.on('message', function(message) {
-    debug('message from worker %d: %j', worker.id, message);
-    if (message.cmd == 'FLOCK_INTERNAL_queryServer') {
+  messages.wait(worker, 'queryServer', 0, function(m) {
 
-      var args = [message.address,
-                 message.port,
-                 message.addressType,
-                 message.fd];
-      var key = args.join(':');
-      var handler;
+    var handler = servers.getServer(m.address, m.port, m.addressType, m.fd);
 
-      if (serverHandlers.hasOwnProperty(key)) {
-       handler = serverHandlers[key];
-      } else if (message.addressType === 'udp4' ||
-                message.addressType === 'udp6') {
-       var dgram = require('dgram');
-       handler = dgram._createSocketHandle.apply(net, args);
-       serverHandlers[key] = handler;
-      } else {
-       handler = net._createServerHandle.apply(net, args);
-       serverHandlers[key] = handler;
-      }
+    var message = {
+      cmd: 'serverHandle',
+      address:     m.address,
+      port:        m.port,
+      addressType: m.addressType,
+      fd:          m.fd
+    };
 
-      debug('constructed handle: %j', handler);
+    messages.send(worker, message, handler);
 
-      // echo callback with the fd handler associated with it
-      worker.send({
-        cmd: 'FLOCK_INTERNAL_serverHandle',
-        address:     message.address,
-        port:        message.port,
-        addressType: message.addressType,
-        fd:          message.fd
-      }, handler);
-    }
+    messages.wait(worker, 'listening', settings.timeout, function(m) {
+      debug('worker %d is listening', worker.id);
+      worker.emit('listening', message);
+    }, function() {
+      console.error('[master' + process.pid + '] timeout expecting the worker ' + worker.id + ' to listen');
+    });
+
   });
 }
 
@@ -76,7 +72,7 @@ function fork() {
   debug('fork with arguments %j', arguments);
   var worker = cluster.fork.apply(cluster, arguments);
   workerInit(worker);
-  return worker;
+  return Worker.wrap(worker);
 };
 
 
@@ -115,9 +111,13 @@ function restart(env, cb) {
 
   var newMaster = fork(process.argv[1], options);
 
-  newMaster.once('message', function(m) {
-    debug('message from new master: %j', m)
-    assert.equal(m, prefix + 'online');
+  messages.wait(newMaster, 'online', settings.timeout, function(m, handle) {
+    killAllWorkers(function() {
+      debug('killed all workers');
+      if (cb) cb(newMaster);
+    });
+  }, function() {
+    /// timeout
     killAllWorkers(function() {
       debug('killed all workers');
       if (cb) cb(newMaster);
@@ -130,18 +130,6 @@ function restart(env, cb) {
 };
 
 
-/// Send Internal Message
-
-var prefix = '_FLOCK_CLUSTER_'
-
-function sendInternalMessage(m) {
-  m = prefix + m;
-  debug('sending internal message to original master %j', m)
-  process.send(m);
-}
-
-
 /// Master <=> Master
-
 if (process.env._FLOCK_CLUSTER_MASTER_)
-  sendInternalMessage('online');
+  messages.sendInternal('online');

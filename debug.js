@@ -14,7 +14,8 @@ if (process.env.FLOCK_DEBUG) {
 }
 
 var Debug =
-exports = module.exports =
+exports =
+module.exports =
 function Debug(scope) {
   var prefix = '[' + scope + '] ';
   return function _debug() {
@@ -22,3 +23,11 @@ function Debug(scope) {
     debug.apply(null, arguments);
   }
 };
+
+exports.figureOutContext =
+function figureOutContext() {
+  var cluster = require('cluster');
+
+  var prefix = cluster.isMaster ? ('master ' + process.pid) : ('worker ' + cluster.worker.id);
+  return Debug(prefix);
+}

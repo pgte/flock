@@ -12,8 +12,6 @@ var commands = {};
 commands.listen =
 function(command) {
 
-  console.log('gonna listen');
-  
   assert(command.port);
   var s = require('net').createServer();
   s.listen(command.port);
